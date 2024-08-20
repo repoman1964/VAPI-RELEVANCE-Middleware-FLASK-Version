@@ -8,7 +8,7 @@ __pycache__/
 *.so
 
 # Environment variables
-.env
+*.env
 
 # Distribution / packaging
 .Python
