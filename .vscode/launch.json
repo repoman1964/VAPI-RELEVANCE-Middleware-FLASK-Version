@@ -22,6 +22,25 @@
             ],
             "jinja": true,
             "autoStartBrowser": false
+        },
+        {
+            "name": "Python Debugger: Doc Strings Flask",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "flask",
+            "env": {
+                "FLASK_APP": "translator_doc_strings.py",
+                "FLASK_DEBUG": "1"
+            },
+            "args": [
+                "run",
+                "--no-debugger",
+                "--no-reload",
+                "--port",
+                "8000"
+            ],
+            "jinja": true,
+            "autoStartBrowser": false
         }
     ]
 }

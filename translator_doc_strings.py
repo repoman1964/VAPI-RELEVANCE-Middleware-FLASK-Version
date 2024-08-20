@@ -4,6 +4,12 @@ import requests
 import time
 import sqlite3
 
+"""
+This Flask application integrates with the Relevance API to provide a custom language model interface.
+It includes routes for chat completions and creating transient assistants, along with database operations
+for storing conversation information.
+"""
+
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
@@ -17,9 +23,11 @@ RELEVANCE_API_KEY = os.environ.get('RELEVANCE_API_KEY')
 MAX_POLL_ATTEMPTS = 120
 POLL_DELAY = 1
 
-# sqlite related stuff
-# database setup
 def setup_database():
+    """
+    Sets up the SQLite database and creates the 'conversation' table if it doesn't exist.
+    This function should be called before the application starts handling requests.
+    """
     conn = sqlite3.connect('conversations.db')
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS conversation
@@ -29,10 +37,17 @@ def setup_database():
 
 setup_database()
 
-# relevance related stuff
-
 def trigger_agent(relevance_agent_id, user_content):
-  
+    """
+    Triggers a Relevance agent with the given user content.
+
+    Args:
+        relevance_agent_id (str): The ID of the Relevance agent to trigger.
+        user_content (str): The user's message content.
+
+    Returns:
+        dict: The JSON response from the Relevance API, or None if an error occurred.
+    """
     url = f"{BASE_URL}/agents/trigger"
     payload = {
         "message": {
@@ -42,19 +57,14 @@ def trigger_agent(relevance_agent_id, user_content):
         "agent_id": relevance_agent_id
     }
 
-    # query db for existence of conversation_id
-    # connect to the database
     conn = sqlite3.connect('conversations.db')
     cursor = conn.cursor()
-    # fetch conversation
     cursor.execute("SELECT * FROM conversation")
     conversation = cursor.fetchone()
+    conn.close()
 
     if conversation:       
         relevance_conversation_id = conversation[2]
-
-    # Close the connection
-    conn.close()
 
     if relevance_conversation_id != 1234:
         payload["conversation_id"] = relevance_conversation_id
@@ -76,7 +86,16 @@ def trigger_agent(relevance_agent_id, user_content):
         return None
 
 def poll_for_updates(studio_id, job_id):
-    
+    """
+    Polls the Relevance API for updates on a specific job.
+
+    Args:
+        studio_id (str): The ID of the studio.
+        job_id (str): The ID of the job to poll for.
+
+    Returns:
+        dict: The output of the job if successful, or None if polling failed or timed out.
+    """
     url = f"{BASE_URL}/studios/{studio_id}/async_poll/{job_id}"
     headers = {
         'Authorization': f"{RELEVANCE_PROJECT_ID}:{RELEVANCE_API_KEY}"
@@ -101,19 +120,20 @@ def poll_for_updates(studio_id, job_id):
     print("Max polling attempts reached without success")
     return None
 
-
-# vapi related stuff
-
 @custom_llm.route('/chat/completions', methods=['POST'])
-def custom_llm_route():   
+def custom_llm_route():
+    """
+    Handles POST requests for chat completions.
+    This route triggers a Relevance agent, polls for updates, and streams the response back to the client.
+
+    Returns:
+        Response: A streaming response containing the agent's reply.
+    """
     request_data = request.get_json()
 
-    # get the relevance_agent_id (passed from vapi as model)
     relevance_agent_id = request_data.get('model')
-    #  set a placeholder for the conversation_id (1234 means first message)
     relevance_conversation_id = "1234"
 
-    # persist agent/conversation instance to database   
     try:
         conn = sqlite3.connect('conversations.db')
         c = conn.cursor()
@@ -137,8 +157,6 @@ def custom_llm_route():
     if 'conversation_id' not in job or 'job_info' not in job:
         return jsonify({"error": "Invalid response from trigger_agent"}), 500
 
-    # conversation_id = job['conversation_id']
-
     studio_id = job['job_info'].get('studio_id')
     job_id = job['job_info'].get('job_id')
     
@@ -153,7 +171,12 @@ def custom_llm_route():
     latest_response = agent_response.get('answer', '')
 
     def generate():
-       
+        """
+        Generator function to stream the agent's response word by word.
+
+        Yields:
+            str: JSON-formatted string containing a word from the agent's response.
+        """
         words = latest_response.split()
         for word in words:
             json_data = json.dumps({
@@ -173,6 +196,13 @@ def custom_llm_route():
 
 @app.route('/create-transient-assistant', methods=['POST'])
 def create_transient_assistant():
+    """
+    Handles POST requests to create a transient assistant.
+    This route returns a configuration for a custom language model assistant.
+
+    Returns:
+        Response: JSON containing the assistant configuration.
+    """
     if request.method != 'POST':
         return jsonify({'error': 'Invalid request method'}), 405
     
