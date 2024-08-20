@@ -29,7 +29,7 @@
             "request": "launch",
             "module": "flask",
             "env": {
-                "FLASK_APP": "translator_doc_strings.py",
+                "FLASK_APP": "dawn_middleware.py",
                 "FLASK_DEBUG": "1"
             },
             "args": [

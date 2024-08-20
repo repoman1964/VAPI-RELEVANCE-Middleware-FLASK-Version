@@ -120,6 +120,43 @@ def poll_for_updates(studio_id, job_id):
     print("Max polling attempts reached without success")
     return None
 
+
+@app.route('/create-transient-assistant', methods=['POST'])
+def handleVAPIServerMessages():    
+    if request.method != 'POST':
+        return jsonify({'error': 'Invalid request method'}), 405
+    
+    try:
+        request_data = request.get_json()
+    except Exception as e:
+        return jsonify({'error': 'Invalid JSON'}), 400
+    
+    type_status = request_data.get('message', {}).get('type')
+    if type_status == 'assistant-request':
+        print(f"VAPI Server Message Status: {type_status}" )
+        assistant_config = create_transient_assistant()
+        return jsonify(assistant_config)  # Return the config directly
+    elif type_status == 'status-update':
+        message_status = request_data.get('message', {}).get('status')
+        if message_status == 'in-progress':
+            print(f"VAPI Server Message Status: {message_status}" )
+        elif message_status == 'ended':
+            conn = sqlite3.connect('conversations.db')
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM conversation")
+            conn.commit()
+            conn.close()
+            print(f"VAPI Server Message Status: {message_status}" )
+    elif type_status == "end-of-call-report":
+        print(f"VAPI Server Message Status: {type_status}" )
+    else:
+        return jsonify({'error': 'Invalid message type'}), 400
+
+    return jsonify({'message': 'Request processed successfully'})  # Return a simple message for non-assistant requests
+      
+    
+   
+
 @custom_llm.route('/chat/completions', methods=['POST'])
 def custom_llm_route():
     """
@@ -194,28 +231,13 @@ def custom_llm_route():
 
     return Response(generate(), content_type='text/event-stream')
 
-@app.route('/create-transient-assistant', methods=['POST'])
 def create_transient_assistant():
     """
-    Handles POST requests to create a transient assistant.
-    This route returns a configuration for a custom language model assistant.
+    Creates and returns a configuration for a custom language model assistant.
 
     Returns:
-        Response: JSON containing the assistant configuration.
+        dict: The assistant configuration.
     """
-    if request.method != 'POST':
-        return jsonify({'error': 'Invalid request method'}), 405
-    
-    try:
-        request_data = request.get_json()
-    except Exception as e:
-        return jsonify({'error': 'Invalid JSON'}), 400
-    
-    if request_data.get("message", {}).get("type") != "assistant-request":
-        # for now, ignore other server messages
-        pass
-        
-    # config INBOUND Transient Assistant
     assistant_config = {
         "assistant": {
             "transcriber": {
@@ -249,8 +271,7 @@ def create_transient_assistant():
             }
         }
     }    
-        
-    return jsonify(assistant_config)
+    return assistant_config
 
 app.register_blueprint(custom_llm)
 
