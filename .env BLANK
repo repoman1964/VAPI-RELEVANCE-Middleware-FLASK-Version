@@ -1,0 +1,15 @@
+DEBUG=True
+
+# RELEVANCE AI
+RELEVANCE_REGION = ''
+RELEVANCE_PROJECT_ID = ''
+RELEVANCE_API_BASE_URL = 'https://api-{region}.stack.tryrelevance.com/latest'
+RELEVANCE_API_KEY = ''
+RELEVANCE_AUTHORIZATION_TOKEN = ''
+
+
+
+
+
+
+
