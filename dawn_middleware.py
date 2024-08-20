@@ -122,7 +122,7 @@ def poll_for_updates(studio_id, job_id):
 
 
 @app.route('/create-transient-assistant', methods=['POST'])
-def handleVAPIServerMessages():    
+def create_transient_assistant():    
     if request.method != 'POST':
         return jsonify({'error': 'Invalid request method'}), 405
     
@@ -134,7 +134,7 @@ def handleVAPIServerMessages():
     type_status = request_data.get('message', {}).get('type')
     if type_status == 'assistant-request':
         print(f"VAPI Server Message Status: {type_status}" )
-        assistant_config = create_transient_assistant()
+        assistant_config = return_assistant_config()
         return jsonify(assistant_config)  # Return the config directly
     elif type_status == 'status-update':
         message_status = request_data.get('message', {}).get('status')
@@ -231,7 +231,7 @@ def custom_llm_route():
 
     return Response(generate(), content_type='text/event-stream')
 
-def create_transient_assistant():
+def return_assistant_config():
     """
     Creates and returns a configuration for a custom language model assistant.
 
