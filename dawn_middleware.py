@@ -37,6 +37,23 @@ def setup_database():
     conn.commit()
     conn.close()
 
+def delete_all_records():
+    """
+    Deletes all records from the conversation table.
+    """
+    try:
+        conn = sqlite3.connect('conversations.db')
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM conversation")
+        conn.commit()
+        print("All records deleted successfully.")
+    except sqlite3.Error as e:
+        print(f"An error occurred while deleting records: {e}")
+    finally:
+        conn.close()
+
+
+
 def trigger_agent(relevance_agent_id, user_content):
     """
     Triggers a Relevance agent with the given user content.
@@ -66,7 +83,7 @@ def trigger_agent(relevance_agent_id, user_content):
     if conversation:       
         relevance_conversation_id = conversation[2]
 
-    if relevance_conversation_id != 1234:
+    if relevance_conversation_id != '1234':
         payload["conversation_id"] = relevance_conversation_id
 
     headers = {
@@ -179,28 +196,43 @@ def manage_vapi_server_messages():
         print(f"VAPI Server Message Status: {type}" )
         assistant_config = return_assistant_config()
         return jsonify(assistant_config)
-    else:
-        return jsonify({'message': '{type} requestprocessed successfully'}), 200  
+    elif type == 'status-update':
+        status = request_data.get('message', {}).get('status')
+        if status == 'ended':
+            print("Call ended. Deleting all records.")
+            delete_all_records()
+            return jsonify({'message': 'Call ended. All records deleted.'}), 200
+        
+    return jsonify({'message': f'{type} request processed successfully'}), 200  
 
 @custom_llm.route('/chat/completions', methods=['POST'])
 def chat_completions():
-    """
-    Handles POST requests for chat completions.
-    This route triggers a Relevance agent, polls for updates, and streams the response back to the client.
-
-    Returns:
-        Response: A streaming response containing the agent's reply.
-    """
     request_data = request.get_json()
 
     relevance_agent_id = request_data.get('model')
-    relevance_conversation_id = "1234"
-
+    
     try:
         conn = sqlite3.connect('conversations.db')
         c = conn.cursor()
-        c.execute("INSERT INTO conversation (relevance_agent_id, relevance_conversation_id) VALUES (?, ?)",
-          (relevance_agent_id, relevance_conversation_id))
+        
+        # Check if a record exists
+        c.execute("SELECT relevance_agent_id, relevance_conversation_id FROM conversation LIMIT 1")
+        existing_record = c.fetchone()
+        
+        if existing_record:
+            existing_agent_id, existing_conversation_id = existing_record
+            if existing_conversation_id != "1234":
+                c.execute("UPDATE conversation SET relevance_agent_id = ?",
+                          (relevance_agent_id,))
+                relevance_conversation_id = existing_conversation_id
+            else:
+                relevance_conversation_id = "1234"
+        else:
+            # No record exists, insert a new one with the placeholder
+            relevance_conversation_id = "1234"
+            c.execute("INSERT INTO conversation (relevance_agent_id, relevance_conversation_id) VALUES (?, ?)",
+                      (relevance_agent_id, relevance_conversation_id))
+        
         conn.commit()
     except sqlite3.Error as e:
         return jsonify({'error': f'Database error: {str(e)}'}), 500
@@ -232,13 +264,21 @@ def chat_completions():
 
     latest_response = agent_response.get('answer', '')
 
-    def generate():
-        """
-        Generator function to stream the agent's response word by word.
+    # After getting the response from Relevance API
+    if job and 'conversation_id' in job:
+        real_conversation_id = job['conversation_id']
+        if real_conversation_id != "1234":
+            try:
+                conn = sqlite3.connect('conversations.db')
+                c = conn.cursor()
+                c.execute("UPDATE conversation SET relevance_conversation_id = ?", (real_conversation_id,))
+                conn.commit()
+            except sqlite3.Error as e:
+                print(f"Error updating conversation ID: {e}")
+            finally:
+                conn.close()
 
-        Yields:
-            str: JSON-formatted string containing a word from the agent's response.
-        """
+    def generate():
         words = latest_response.split()
         for word in words:
             json_data = json.dumps({
