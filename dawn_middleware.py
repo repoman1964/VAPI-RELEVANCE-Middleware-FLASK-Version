@@ -23,6 +23,8 @@ RELEVANCE_API_KEY = os.environ.get('RELEVANCE_API_KEY')
 MAX_POLL_ATTEMPTS = 120
 POLL_DELAY = 1
 
+# HELPER FUNCTIONS
+
 def setup_database():
     """
     Sets up the SQLite database and creates the 'conversation' table if it doesn't exist.
@@ -34,8 +36,6 @@ def setup_database():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, relevance_agent_id TEXT, relevance_conversation_id TEXT)''')
     conn.commit()
     conn.close()
-
-setup_database()
 
 def trigger_agent(relevance_agent_id, user_content):
     """
@@ -120,45 +120,70 @@ def poll_for_updates(studio_id, job_id):
     print("Max polling attempts reached without success")
     return None
 
+def return_assistant_config():
+    """
+    Creates and returns a configuration for a custom language model assistant.
 
-@app.route('/create-transient-assistant', methods=['POST'])
-def create_transient_assistant():    
+    Returns:
+        dict: The assistant configuration.
+    """
+    assistant_config = {
+        "assistant": {
+            "transcriber": {
+                "provider": "deepgram",
+                "model": "nova-2",
+                "language": "en"
+            },
+            "model": {
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Answer the callers questions as succintly as possible. Yes or no answers are completely acceptable when appropriate."
+                    }
+                ],
+                "provider": "custom-llm",
+                "model": "a6fdacc8-cc99-4334-88a8-5d0d85e4be52",
+                "url": "https://29e9-24-96-15-35.ngrok-free.app/",                   
+                "maxTokens": 250
+            },
+            "voice": {
+                "provider": "azure",
+                "voiceId": "andrew",
+                "speed": 1
+            },
+            "firstMessageMode": "assistant-speaks-first",
+            "hipaaEnabled": False,
+            "recordingEnabled": True,
+            "firstMessage": "Hey. Hi. Howdy.",
+            "voicemailDetection": {
+                "provider": "twilio"
+            }
+        }
+    }    
+    return assistant_config
+
+# ENDPOINTS
+
+@custom_llm.route('/manage-vapi-server-messages', methods=['POST'])
+def manage_vapi_server_messages():
     if request.method != 'POST':
         return jsonify({'error': 'Invalid request method'}), 405
-    
+     
     try:
         request_data = request.get_json()
     except Exception as e:
         return jsonify({'error': 'Invalid JSON'}), 400
     
-    type_status = request_data.get('message', {}).get('type')
-    if type_status == 'assistant-request':
-        print(f"VAPI Server Message Status: {type_status}" )
+    type = request_data.get('message', {}).get('type')
+    if type == 'assistant-request':
+        print(f"VAPI Server Message Status: {type}" )
         assistant_config = return_assistant_config()
-        return jsonify(assistant_config)  # Return the config directly
-    elif type_status == 'status-update':
-        message_status = request_data.get('message', {}).get('status')
-        if message_status == 'in-progress':
-            print(f"VAPI Server Message Status: {message_status}" )
-        elif message_status == 'ended':
-            conn = sqlite3.connect('conversations.db')
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM conversation")
-            conn.commit()
-            conn.close()
-            print(f"VAPI Server Message Status: {message_status}" )
-    elif type_status == "end-of-call-report":
-        print(f"VAPI Server Message Status: {type_status}" )
+        return jsonify(assistant_config)
     else:
-        return jsonify({'error': 'Invalid message type'}), 400
-
-    return jsonify({'message': 'Request processed successfully'})  # Return a simple message for non-assistant requests
-      
-    
-   
+        return jsonify({'message': '{type} requestprocessed successfully'}), 200  
 
 @custom_llm.route('/chat/completions', methods=['POST'])
-def custom_llm_route():
+def chat_completions():
     """
     Handles POST requests for chat completions.
     This route triggers a Relevance agent, polls for updates, and streams the response back to the client.
@@ -231,49 +256,8 @@ def custom_llm_route():
 
     return Response(generate(), content_type='text/event-stream')
 
-def return_assistant_config():
-    """
-    Creates and returns a configuration for a custom language model assistant.
-
-    Returns:
-        dict: The assistant configuration.
-    """
-    assistant_config = {
-        "assistant": {
-            "transcriber": {
-                "provider": "deepgram",
-                "model": "nova-2",
-                "language": "en"
-            },
-            "model": {
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "Answer the callers questions as succintly as possible. Yes or no answers are completely acceptable when appropriate."
-                    }
-                ],
-                "provider": "custom-llm",
-                "model": "a6fdacc8-cc99-4334-88a8-5d0d85e4be52",
-                "url": "https://29e9-24-96-15-35.ngrok-free.app/",                   
-                "maxTokens": 250
-            },
-            "voice": {
-                "provider": "azure",
-                "voiceId": "andrew",
-                "speed": 1
-            },
-            "firstMessageMode": "assistant-speaks-first",
-            "hipaaEnabled": False,
-            "recordingEnabled": True,
-            "firstMessage": "Hey. Hi. Howdy.",
-            "voicemailDetection": {
-                "provider": "twilio"
-            }
-        }
-    }    
-    return assistant_config
-
 app.register_blueprint(custom_llm)
+setup_database()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
