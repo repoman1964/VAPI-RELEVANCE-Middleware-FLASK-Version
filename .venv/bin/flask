@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/home/jose/Documents/MARION SYSTEMS/DIMENSION SEVEN SYSTEMS/YT PROJECT VIDS/VAPI_RELEVANCE_TRANSLATOR/Flask Version/.venv/bin/python" "$0" "$@"
+'''exec' "/home/jose/Documents/MARION SYSTEMS/DIMENSION SEVEN SYSTEMS/YT PROJECT VIDS/VAPI_RELEVANCE_MIDDLEWARE/Flask Version/.venv/bin/python" "$0" "$@"
 ' '''
 # -*- coding: utf-8 -*-
 import re

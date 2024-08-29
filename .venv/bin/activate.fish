@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/home/jose/Documents/MARION SYSTEMS/DIMENSION SEVEN SYSTEMS/YT PROJECT VIDS/VAPI_RELEVANCE_TRANSLATOR/Flask Version/.venv"
+set -gx VIRTUAL_ENV "/home/jose/Documents/MARION SYSTEMS/DIMENSION SEVEN SYSTEMS/YT PROJECT VIDS/VAPI_RELEVANCE_MIDDLEWARE/Flask Version/.venv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH
